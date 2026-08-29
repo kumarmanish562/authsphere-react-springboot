@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: authsphere-backend
+
+  profiles:
+    active: dev
+
+server:
+  port: 8082
+
+
+# ==========================================
+# AuthSphere Backend Configurations
+# ==========================================
+
+# ------------------------------------------
+# Database Configurations
+# ------------------------------------------
+
+# MySQL Configurations
+
+
+# ------------------------------------------
+# Email Configurations
+# ------------------------------------------
+
+
+# ------------------------------------------
+# OAuth2 Configurations
+# ------------------------------------------
