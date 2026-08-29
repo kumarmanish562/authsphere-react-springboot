@@ -1,4 +1,4 @@
-package com.authsphere_backend.services;
+package com.authsphere_backend.services.impl;
 
 import com.authsphere_backend.dtos.UserDto;
 import com.authsphere_backend.entities.Provider;
@@ -6,6 +6,7 @@ import com.authsphere_backend.entities.User;
 import com.authsphere_backend.exceptions.ResourceNotFoundException;
 import com.authsphere_backend.helpers.UserHelper;
 import com.authsphere_backend.repositories.UserRepository;
+import com.authsphere_backend.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
