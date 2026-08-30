@@ -59,6 +59,14 @@ public class SecurityConfig {
                                 ).permitAll()
 
                                 .requestMatchers(
+                                        "/api/m1/auth/refresh"
+                                ).permitAll()
+
+                                .requestMatchers(
+                                        "/api/m1/auth/logout"
+                                ).permitAll()
+
+                                .requestMatchers(
                                         "/error"
                                 ).permitAll()
 

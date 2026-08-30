@@ -3,6 +3,7 @@ package com.authsphere_backend.controllers;
 import com.authsphere_backend.Security.CookieService;
 import com.authsphere_backend.Security.JwtService;
 import com.authsphere_backend.dtos.LoginRequest;
+import com.authsphere_backend.dtos.RefreshTokenRequest;
 import com.authsphere_backend.dtos.TokenResponse;
 import com.authsphere_backend.dtos.UserDto;
 import com.authsphere_backend.entities.RefreshToken;
@@ -11,12 +12,16 @@ import com.authsphere_backend.repositories.RefreshTokenRepository;
 import com.authsphere_backend.repositories.UserRepository;
 import com.authsphere_backend.services.AuthService;
 
+import io.jsonwebtoken.JwtException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import lombok.RequiredArgsConstructor;
 
 import org.modelmapper.ModelMapper;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -27,9 +32,15 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 
 import org.springframework.security.core.Authentication;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Optional;
 import java.util.UUID;
 
 
@@ -68,6 +79,415 @@ public class AuthController {
                 .body(
                         authService.registerUser(userDto)
                 );
+    }
+
+
+    @PostMapping("/refresh")
+    @Transactional
+    public ResponseEntity<TokenResponse> refreshToken(
+            @RequestBody(required = false) RefreshTokenRequest body,
+            HttpServletResponse response,
+            HttpServletRequest request
+    ) {
+
+        // ==========================================================
+        // 1. READ REFRESH TOKEN
+        // ==========================================================
+
+        String refreshToken =
+                readRefreshTokenFromRequest(body, request)
+                        .orElseThrow(() ->
+                                new BadCredentialsException(
+                                        "Refresh token missing"
+                                )
+                        );
+
+
+        // ==========================================================
+        // 2. CHECK REFRESH TOKEN TYPE
+        // ==========================================================
+
+        if (!jwtService.isRefreshToken(refreshToken)) {
+
+            throw new BadCredentialsException(
+                    "Invalid refresh token type"
+            );
+        }
+
+
+        // ==========================================================
+        // 3. GET JTI FROM JWT
+        // ==========================================================
+
+        String jti =
+                jwtService.getJti(refreshToken);
+
+
+        // ==========================================================
+        // 4. GET USER ID FROM JWT
+        // ==========================================================
+
+        UUID userId =
+                jwtService.getUserId(refreshToken);
+
+
+        // ==========================================================
+        // 5. FIND TOKEN IN DATABASE
+        // ==========================================================
+
+        RefreshToken storedRefreshToken =
+                refreshTokenRepository
+                        .findByJti(jti)
+                        .orElseThrow(() ->
+                                new BadCredentialsException(
+                                        "Invalid refresh token"
+                                )
+                        );
+
+
+        // ==========================================================
+        // 6. CHECK TOKEN REVOCATION
+        // ==========================================================
+
+        if (storedRefreshToken.isRevoked()) {
+
+            throw new BadCredentialsException(
+                    "Refresh token has been revoked"
+            );
+        }
+
+
+        // ==========================================================
+        // 7. CHECK DATABASE EXPIRATION
+        // ==========================================================
+
+        if (storedRefreshToken
+                .getExpiresAt()
+                .isBefore(Instant.now())) {
+
+            throw new BadCredentialsException(
+                    "Refresh token has expired"
+            );
+        }
+
+
+        // ==========================================================
+        // 8. CHECK USER OWNERSHIP
+        // ==========================================================
+
+        if (!storedRefreshToken
+                .getUser()
+                .getId()
+                .equals(userId)) {
+
+            throw new BadCredentialsException(
+                    "Refresh token does not belong to this user"
+            );
+        }
+
+
+        // ==========================================================
+        // 9. GET USER
+        // ==========================================================
+
+        User user =
+                storedRefreshToken.getUser();
+
+
+        // ==========================================================
+        // 10. ROTATE OLD REFRESH TOKEN
+        // ==========================================================
+
+        String newJti =
+                UUID.randomUUID().toString();
+
+        storedRefreshToken.setRevoked(true);
+
+        storedRefreshToken.setReplacedByToken(
+                newJti
+        );
+
+        refreshTokenRepository.save(
+                storedRefreshToken
+        );
+
+
+        // ==========================================================
+        // 11. CREATE NEW REFRESH TOKEN DATABASE RECORD
+        // ==========================================================
+
+        Instant now =
+                Instant.now();
+
+        RefreshToken newRefreshTokenEntity =
+                RefreshToken.builder()
+                        .jti(newJti)
+                        .user(user)
+                        .createdAt(now)
+                        .expiresAt(
+                                now.plusSeconds(
+                                        jwtService.getRefreshTtlSeconds()
+                                )
+                        )
+                        .revoked(false)
+                        .build();
+
+        refreshTokenRepository.save(
+                newRefreshTokenEntity
+        );
+
+
+        // ==========================================================
+        // 12. GENERATE NEW ACCESS TOKEN
+        // ==========================================================
+
+        String newAccessToken =
+                jwtService.generateAccessToken(user);
+
+
+        // ==========================================================
+        // 13. GENERATE NEW REFRESH TOKEN JWT
+        // ==========================================================
+
+        String newRefreshToken =
+                jwtService.generateRefreshToken(
+                        user,
+                        newJti
+                );
+
+
+        // ==========================================================
+        // 14. REPLACE REFRESH TOKEN COOKIE
+        // ==========================================================
+
+        cookieService.attachRefreshCookie(
+                response,
+                newRefreshToken,
+                jwtService.getRefreshTtlSeconds()
+        );
+
+
+        // ==========================================================
+        // 15. PREVENT CACHING
+        // ==========================================================
+
+        cookieService.addNoStoreHeaders(
+                response
+        );
+
+
+        // ==========================================================
+        // 16. RETURN RESPONSE
+        // ==========================================================
+
+        return ResponseEntity.ok(
+                TokenResponse.of(
+                        newAccessToken,
+                        newRefreshToken,
+                        jwtService.getAccessTtlSeconds(),
+                        modelMapper.map(
+                                user,
+                                UserDto.class
+                        )
+                )
+        );
+    }
+
+    private Optional<String> readRefreshTokenFromRequest(
+            RefreshTokenRequest body,
+            HttpServletRequest request
+    ) {
+
+        // ==========================================================
+        // 1. COOKIE
+        // ==========================================================
+
+        if (request.getCookies() != null) {
+
+            Optional<String> fromCookie =
+                    Arrays.stream(request.getCookies())
+                            .filter(cookie ->
+                                    cookieService
+                                            .getRefreshTokenCookieName()
+                                            .equals(cookie.getName())
+                            )
+                            .map(Cookie::getValue)
+                            .filter(value ->
+                                    value != null &&
+                                            !value.isBlank()
+                            )
+                            .findFirst();
+
+            if (fromCookie.isPresent()) {
+                return fromCookie;
+            }
+        }
+
+
+        // ==========================================================
+        // 2. REQUEST BODY
+        // ==========================================================
+
+        if (body != null &&
+                body.refreshToken() != null &&
+                !body.refreshToken().isBlank()) {
+
+            return Optional.of(
+                    body.refreshToken().trim()
+            );
+        }
+
+
+        // ==========================================================
+        // 3. X-Refresh-Token HEADER
+        // ==========================================================
+
+        String refreshHeader =
+                request.getHeader("X-Refresh-Token");
+
+        if (refreshHeader != null &&
+                !refreshHeader.isBlank()) {
+
+            return Optional.of(
+                    refreshHeader.trim()
+            );
+        }
+
+
+        // ==========================================================
+        // 4. AUTHORIZATION HEADER
+        // ==========================================================
+
+        String authorizationHeader =
+                request.getHeader(
+                        HttpHeaders.AUTHORIZATION
+                );
+
+        if (authorizationHeader != null &&
+                authorizationHeader.regionMatches(
+                        true,
+                        0,
+                        "Bearer ",
+                        0,
+                        7
+                )) {
+
+            String candidate =
+                    authorizationHeader
+                            .substring(7)
+                            .trim();
+
+            if (!candidate.isEmpty()) {
+                return Optional.of(candidate);
+            }
+        }
+
+
+        // ==========================================================
+        // 5. TOKEN NOT FOUND
+        // ==========================================================
+
+        return Optional.empty();
+    }
+
+
+
+
+// ==========================================================
+// LOGOUT
+// ==========================================================
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
+
+        // ==========================================================
+        // 1. READ REFRESH TOKEN
+        // ==========================================================
+
+        Optional<String> refreshToken =
+                readRefreshTokenFromRequest(
+                        null,
+                        request
+                );
+
+
+        // ==========================================================
+        // 2. REVOKE REFRESH TOKEN
+        // ==========================================================
+
+        refreshToken.ifPresent(token -> {
+
+            try {
+
+                // Check token type
+                if (jwtService.isRefreshToken(token)) {
+
+                    // Extract JTI
+                    String jti =
+                            jwtService.getJti(token);
+
+                    // Find token in database
+                    refreshTokenRepository
+                            .findByJti(jti)
+                            .ifPresent(storedToken -> {
+
+                                // Revoke token
+                                storedToken.setRevoked(true);
+
+                                refreshTokenRepository.save(
+                                        storedToken
+                                );
+                            });
+                }
+
+            } catch (JwtException e) {
+
+                // Token is invalid/expired/malformed.
+                // Cookie will still be cleared below.
+
+            } catch (Exception e) {
+
+                // Do not prevent cookie cleanup
+                // because of an unexpected database error.
+            }
+        });
+
+
+        // ==========================================================
+        // 3. CLEAR REFRESH TOKEN COOKIE
+        // ==========================================================
+
+        cookieService.clearRefreshCookie(
+                response
+        );
+
+
+        // ==========================================================
+        // 4. PREVENT CACHING
+        // ==========================================================
+
+        cookieService.addNoStoreHeaders(
+                response
+        );
+
+
+        // ==========================================================
+        // 5. CLEAR SECURITY CONTEXT
+        // ==========================================================
+
+        SecurityContextHolder.clearContext();
+
+
+        // ==========================================================
+        // 6. RETURN 204 NO CONTENT
+        // ==========================================================
+
+        return ResponseEntity
+                .noContent()
+                .build();
     }
 
 
@@ -245,4 +665,7 @@ public class AuthController {
             );
         }
     }
+
+
+
 }

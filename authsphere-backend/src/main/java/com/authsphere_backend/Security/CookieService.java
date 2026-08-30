@@ -111,9 +111,9 @@ public class CookieService {
     }
 
 
-    // ==========================================================
-    // CLEAR REFRESH TOKEN COOKIE
-    // ==========================================================
+// ==========================================================
+// CLEAR REFRESH TOKEN COOKIE
+// ==========================================================
 
     public void clearRefreshCookie(
             HttpServletResponse response
@@ -131,6 +131,9 @@ public class CookieService {
                         .maxAge(0)
                         .sameSite(cookieSameSite);
 
+        // ==========================================================
+        // COOKIE DOMAIN
+        // ==========================================================
 
         if (cookieDomain != null &&
                 !cookieDomain.isBlank()) {
@@ -138,21 +141,25 @@ public class CookieService {
             builder.domain(cookieDomain);
         }
 
+        // ==========================================================
+        // BUILD COOKIE
+        // ==========================================================
 
         ResponseCookie cookie =
                 builder.build();
 
+        // ==========================================================
+        // DELETE COOKIE
+        // ==========================================================
 
         response.addHeader(
                 HttpHeaders.SET_COOKIE,
                 cookie.toString()
         );
 
-
-        logger.info(
-                "Refresh token cookie cleared"
-        );
+        logger.info("Refresh token cookie cleared");
     }
+
 
 
     // ==========================================================
