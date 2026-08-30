@@ -61,25 +61,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize ->
                         authorize
                                 .requestMatchers(
-                                        "/api/m1/auth/register"
+                                        AppConstants
+                                                .AUTH_PUBLIC_URL
                                 ).permitAll()
-
-                                .requestMatchers(
-                                        "/api/m1/auth/login"
-                                ).permitAll()
-
-                                .requestMatchers(
-                                        "/api/m1/auth/refresh"
-                                ).permitAll()
-
-                                .requestMatchers(
-                                        "/api/m1/auth/logout"
-                                ).permitAll()
-
-                                .requestMatchers(
-                                        "/error"
-                                ).permitAll()
-
                                 .anyRequest().authenticated()
                 )
 
