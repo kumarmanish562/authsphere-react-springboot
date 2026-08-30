@@ -2,11 +2,22 @@ package com.authsphere_backend.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+
+/*
+ * ============================================================
+ * USER ENTITY + SPRING SECURITY USERDETAILS
+ * ============================================================
+ */
 
 @Getter
 @Setter
@@ -15,11 +26,12 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "users")
-public class User {
+public class User implements UserDetails {
 
-    // ==========================================
+
+    // ==========================================================
     // PRIMARY KEY
-    // ==========================================
+    // ==========================================================
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -27,9 +39,9 @@ public class User {
     private UUID id;
 
 
-    // ==========================================
+    // ==========================================================
     // USER EMAIL
-    // ==========================================
+    // ==========================================================
 
     @Column(
             name = "user_email",
@@ -40,9 +52,9 @@ public class User {
     private String email;
 
 
-    // ==========================================
+    // ==========================================================
     // USER NAME
-    // ==========================================
+    // ==========================================================
 
     @Column(
             name = "user_name",
@@ -51,34 +63,34 @@ public class User {
     private String name;
 
 
-    // ==========================================
+    // ==========================================================
     // PASSWORD
-    // ==========================================
+    // ==========================================================
 
     @Column(name = "password")
     private String password;
 
 
-    // ==========================================
+    // ==========================================================
     // PROFILE IMAGE
-    // ==========================================
+    // ==========================================================
 
     @Column(name = "image")
     private String image;
 
 
-    // ==========================================
+    // ==========================================================
     // ACCOUNT STATUS
-    // ==========================================
+    // ==========================================================
 
     @Column(name = "enabled")
     @Builder.Default
     private boolean enable = true;
 
 
-    // ==========================================
+    // ==========================================================
     // TIMESTAMPS
-    // ==========================================
+    // ==========================================================
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -87,9 +99,9 @@ public class User {
     private Instant updatedAt;
 
 
-    // ==========================================
+    // ==========================================================
     // AUTHENTICATION PROVIDER
-    // ==========================================
+    // ==========================================================
 
     @Enumerated(EnumType.STRING)
     @Column(name = "provider")
@@ -97,9 +109,9 @@ public class User {
     private Provider provider = Provider.LOCAL;
 
 
-    // ==========================================
+    // ==========================================================
     // USER ROLES
-    // ==========================================
+    // ==========================================================
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -117,9 +129,10 @@ public class User {
     private Set<Role> roles = new HashSet<>();
 
 
-    // ==========================================
+    // ==========================================================
     // BEFORE INSERT
-    // ==========================================
+    // ==========================================================
+
     @PrePersist
     protected void onCreate() {
 
@@ -135,14 +148,88 @@ public class User {
     }
 
 
-
-    // ==========================================
+    // ==========================================================
     // BEFORE UPDATE
-    // ==========================================
+    // ==========================================================
 
     @PreUpdate
     protected void onUpdate() {
 
         updatedAt = Instant.now();
+    }
+
+
+    // ==========================================================
+    // SPRING SECURITY
+    // GET AUTHORITIES / ROLES
+    // ==========================================================
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+
+        return roles
+                .stream()
+                .map(role ->
+                        new SimpleGrantedAuthority(
+                                role.getName()
+                        )
+                )
+                .toList();
+    }
+
+
+    // ==========================================================
+    // SPRING SECURITY
+    // GET USERNAME
+    // ==========================================================
+
+    @Override
+    public String getUsername() {
+
+        return this.email;
+    }
+
+
+    // ==========================================================
+    // ACCOUNT NOT EXPIRED
+    // ==========================================================
+
+    @Override
+    public boolean isAccountNonExpired() {
+
+        return true;
+    }
+
+
+    // ==========================================================
+    // ACCOUNT NOT LOCKED
+    // ==========================================================
+
+    @Override
+    public boolean isAccountNonLocked() {
+
+        return true;
+    }
+
+
+    // ==========================================================
+    // CREDENTIALS NOT EXPIRED
+    // ==========================================================
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+
+        return true;
+    }
+
+
+    // ==========================================================
+    // ACCOUNT ENABLED
+    // ==========================================================
+
+    @Override
+    public boolean isEnabled() {
+
+        return this.enable;
     }
 }
