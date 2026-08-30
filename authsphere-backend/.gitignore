@@ -39,3 +39,8 @@ build/
 src/main/resources/application-dev.yml
 src/main/resources/application-qa.yml
 src/main/resources/application-prod.yml
+
+# Environment variables
+.env
+.env.*
+!.env.example
