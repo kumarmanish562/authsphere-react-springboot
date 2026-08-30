@@ -1,5 +1,6 @@
 package com.authsphere_backend.controllers;
 
+import com.authsphere_backend.Security.CookieService;
 import com.authsphere_backend.Security.JwtService;
 import com.authsphere_backend.dtos.LoginRequest;
 import com.authsphere_backend.dtos.TokenResponse;
@@ -9,43 +10,53 @@ import com.authsphere_backend.entities.User;
 import com.authsphere_backend.repositories.RefreshTokenRepository;
 import com.authsphere_backend.repositories.UserRepository;
 import com.authsphere_backend.services.AuthService;
-import io.jsonwebtoken.Jwt;
+
+import jakarta.servlet.http.HttpServletResponse;
+
 import lombok.RequiredArgsConstructor;
+
 import org.modelmapper.ModelMapper;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+
 import org.springframework.security.core.Authentication;
+
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Ref;
 import java.time.Instant;
 import java.util.UUID;
+
 
 @RestController
 @RequestMapping("/api/m1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
+
     private final AuthService authService;
 
     private final AuthenticationManager authenticationManager;
 
-    private final UserRepository  userRepository;
+    private final UserRepository userRepository;
 
     private final JwtService jwtService;
+
     private final ModelMapper modelMapper;
 
     private final RefreshTokenRepository refreshTokenRepository;
 
+    private final CookieService cookieService;
 
-    // ==========================================
-    // REGISTER USER API
-    // POST /api/m1/auth/register
-    // ==========================================
+
+    // ==========================================================
+    // REGISTER
+    // ==========================================================
 
     @PostMapping("/register")
     public ResponseEntity<UserDto> registerUser(
@@ -54,42 +65,73 @@ public class AuthController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(authService.registerUser(userDto));
+                .body(
+                        authService.registerUser(userDto)
+                );
     }
+
+
+    // ==========================================================
+    // LOGIN
+    // ==========================================================
 
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(
-            @RequestBody LoginRequest loginRequest
+            @RequestBody LoginRequest loginRequest,
+            HttpServletResponse response
     ) {
 
-        // 1. Authenticate email + password
+
+        // ======================================================
+        // 1. AUTHENTICATE USER
+        // ======================================================
+
         authenticate(loginRequest);
 
-        // 2. Find user
-        User user = userRepository
-                .findByEmail(loginRequest.email())
-                .orElseThrow(() ->
-                        new BadCredentialsException(
-                                "Invalid username or password"
-                        )
-                );
 
-        // 3. Check whether user is enabled
+        // ======================================================
+        // 2. FIND USER
+        // ======================================================
+
+        User user =
+                userRepository
+                        .findByEmail(
+                                loginRequest.email()
+                        )
+                        .orElseThrow(() ->
+                                new BadCredentialsException(
+                                        "Invalid username or password"
+                                )
+                        );
+
+
+        // ======================================================
+        // 3. CHECK USER ENABLED
+        // ======================================================
+
         if (!user.isEnable()) {
-            throw new DisabledException("User is disabled");
+
+            throw new DisabledException(
+                    "User is disabled"
+            );
         }
 
-        // ==========================================================
-        // CREATE REFRESH TOKEN JTI
-        // ==========================================================
 
-        String jti = UUID.randomUUID().toString();
+        // ======================================================
+        // 4. CREATE UNIQUE JTI
+        // ======================================================
 
-        // ==========================================================
-        // SAVE REFRESH TOKEN INFORMATION IN DATABASE
-        // ==========================================================
+        String jti =
+                UUID.randomUUID().toString();
 
-        Instant now = Instant.now();
+
+        // ======================================================
+        // 5. CREATE DATABASE REFRESH TOKEN RECORD
+        // ======================================================
+
+        Instant now =
+                Instant.now();
+
 
         RefreshToken refreshTokenEntity =
                 RefreshToken.builder()
@@ -98,24 +140,32 @@ public class AuthController {
                         .createdAt(now)
                         .expiresAt(
                                 now.plusSeconds(
-                                        jwtService.getRefreshTtlSeconds()
+                                        jwtService
+                                                .getRefreshTtlSeconds()
                                 )
                         )
                         .revoked(false)
                         .build();
 
-        refreshTokenRepository.save(refreshTokenEntity);
 
-        // ==========================================================
-        // GENERATE ACCESS TOKEN
-        // ==========================================================
+        refreshTokenRepository.save(
+                refreshTokenEntity
+        );
+
+
+        // ======================================================
+        // 6. GENERATE ACCESS TOKEN
+        // ======================================================
 
         String accessToken =
-                jwtService.generateAccessToken(user);
+                jwtService.generateAccessToken(
+                        user
+                );
 
-        // ==========================================================
-        // GENERATE REFRESH TOKEN
-        // ==========================================================
+
+        // ======================================================
+        // 7. GENERATE REFRESH TOKEN
+        // ======================================================
 
         String refreshToken =
                 jwtService.generateRefreshToken(
@@ -123,9 +173,30 @@ public class AuthController {
                         jti
                 );
 
-        // ==========================================================
-        // CREATE RESPONSE
-        // ==========================================================
+
+        // ======================================================
+        // 8. PUT REFRESH TOKEN INTO HTTP-ONLY COOKIE
+        // ======================================================
+
+        cookieService.attachRefreshCookie(
+                response,
+                refreshToken,
+                jwtService.getRefreshTtlSeconds()
+        );
+
+
+        // ======================================================
+        // 9. PREVENT CACHING
+        // ======================================================
+
+        cookieService.addNoStoreHeaders(
+                response
+        );
+
+
+        // ======================================================
+        // 10. CREATE RESPONSE
+        // ======================================================
 
         TokenResponse tokenResponse =
                 TokenResponse.of(
@@ -138,14 +209,29 @@ public class AuthController {
                         )
                 );
 
-        return ResponseEntity.ok(tokenResponse);
+
+        // ======================================================
+        // 11. RETURN RESPONSE
+        // ======================================================
+
+        return ResponseEntity.ok(
+                tokenResponse
+        );
     }
 
 
-    private Authentication authenticate(LoginRequest loginRequest) {
+    // ==========================================================
+    // AUTHENTICATE
+    // ==========================================================
+
+    private Authentication authenticate(
+            LoginRequest loginRequest
+    ) {
+
         try {
 
             return authenticationManager.authenticate(
+
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.email(),
                             loginRequest.password()
@@ -155,7 +241,7 @@ public class AuthController {
         } catch (Exception e) {
 
             throw new BadCredentialsException(
-                    "Invalid Username or password "
+                    "Invalid username or password"
             );
         }
     }
