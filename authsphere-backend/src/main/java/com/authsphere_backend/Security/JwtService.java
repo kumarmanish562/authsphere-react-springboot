@@ -8,7 +8,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import lombok.Getter;
-import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -22,16 +21,14 @@ import java.util.UUID;
 
 @Service
 @Getter
-@Setter
 public class JwtService {
 
-    // ==========================================================
-    // JWT CONFIGURATION
-    // ==========================================================
-
     private final SecretKey key;
+
     private final long accessTtlSeconds;
+
     private final long refreshTtlSeconds;
+
     private final String issuer;
 
 
@@ -41,9 +38,12 @@ public class JwtService {
 
     public JwtService(
             @Value("${security.jwt.secret}") String secret,
-            @Value("${security.jwt.access-ttl-seconds}") long accessTtlSeconds,
-            @Value("${security.jwt.refresh-ttl-seconds}") long refreshTtlSeconds,
-            @Value("${security.jwt.issuer}") String issuer
+            @Value("${security.jwt.access-ttl-seconds}")
+            long accessTtlSeconds,
+            @Value("${security.jwt.refresh-ttl-seconds}")
+            long refreshTtlSeconds,
+            @Value("${security.jwt.issuer}")
+            String issuer
     ) {
 
         if (secret == null || secret.length() < 64) {
@@ -52,18 +52,32 @@ public class JwtService {
             );
         }
 
+        if (accessTtlSeconds <= 0) {
+            throw new IllegalArgumentException(
+                    "Access token TTL must be greater than 0"
+            );
+        }
+
+        if (refreshTtlSeconds <= 0) {
+            throw new IllegalArgumentException(
+                    "Refresh token TTL must be greater than 0"
+            );
+        }
+
         this.key = Keys.hmacShaKeyFor(
                 secret.getBytes(StandardCharsets.UTF_8)
         );
 
         this.accessTtlSeconds = accessTtlSeconds;
+
         this.refreshTtlSeconds = refreshTtlSeconds;
+
         this.issuer = issuer;
     }
 
 
     // ==========================================================
-    // GENERATE ACCESS TOKEN
+    // ACCESS TOKEN
     // ==========================================================
 
     public String generateAccessToken(User user) {
@@ -79,32 +93,51 @@ public class JwtService {
                         .toList();
 
         return Jwts.builder()
+
                 .id(UUID.randomUUID().toString())
-                .subject(user.getId().toString())
+
+                .subject(
+                        user.getId().toString()
+                )
+
                 .issuer(issuer)
-                .issuedAt(Date.from(now))
+
+                .issuedAt(
+                        Date.from(now)
+                )
+
                 .expiration(
                         Date.from(
-                                now.plusSeconds(accessTtlSeconds)
+                                now.plusSeconds(
+                                        accessTtlSeconds
+                                )
                         )
                 )
+
                 .claims(
                         Map.of(
-                                "email", user.getEmail(),
-                                "roles", roles,
-                                "typ", "access"
+                                "email",
+                                user.getEmail(),
+
+                                "roles",
+                                roles,
+
+                                "typ",
+                                "access"
                         )
                 )
+
                 .signWith(
                         key,
                         SignatureAlgorithm.HS512
                 )
+
                 .compact();
     }
 
 
     // ==========================================================
-    // GENERATE REFRESH TOKEN
+    // REFRESH TOKEN
     // ==========================================================
 
     public String generateRefreshToken(
@@ -115,30 +148,45 @@ public class JwtService {
         Instant now = Instant.now();
 
         return Jwts.builder()
+
                 .id(jti)
-                .subject(user.getId().toString())
+
+                .subject(
+                        user.getId().toString()
+                )
+
                 .issuer(issuer)
-                .issuedAt(Date.from(now))
+
+                .issuedAt(
+                        Date.from(now)
+                )
+
                 .expiration(
                         Date.from(
-                                now.plusSeconds(refreshTtlSeconds)
+                                now.plusSeconds(
+                                        refreshTtlSeconds
+                                )
                         )
                 )
+
                 .claims(
                         Map.of(
-                                "typ", "refresh"
+                                "typ",
+                                "refresh"
                         )
                 )
+
                 .signWith(
                         key,
                         SignatureAlgorithm.HS512
                 )
+
                 .compact();
     }
 
 
     // ==========================================================
-    // PARSE AND VERIFY JWT
+    // PARSE JWT
     // ==========================================================
 
     public Jws<Claims> parse(String token) {
@@ -153,15 +201,57 @@ public class JwtService {
 
 
     // ==========================================================
+    // GET USER ID
+    // ==========================================================
+
+    public UUID getUserId(String token) {
+
+        Claims claims =
+                parse(token).getPayload();
+
+        return UUID.fromString(
+                claims.getSubject()
+        );
+    }
+
+
+    // ==========================================================
+    // GET JTI
+    // ==========================================================
+
+    public String getJti(String token) {
+
+        Claims claims =
+                parse(token).getPayload();
+
+        return claims.getId();
+    }
+
+
+    // ==========================================================
+    // GET TOKEN TYPE
+    // ==========================================================
+
+    public String getTokenType(String token) {
+
+        Claims claims =
+                parse(token).getPayload();
+
+        return claims.get(
+                "typ",
+                String.class
+        );
+    }
+
+
+    // ==========================================================
     // CHECK ACCESS TOKEN
     // ==========================================================
 
     public boolean isAccessToken(String token) {
 
-        Claims claims = parse(token).getPayload();
-
         return "access".equals(
-                claims.get("typ", String.class)
+                getTokenType(token)
         );
     }
 
@@ -172,85 +262,40 @@ public class JwtService {
 
     public boolean isRefreshToken(String token) {
 
-        Claims claims = parse(token).getPayload();
-
         return "refresh".equals(
-                claims.get("typ", String.class)
+                getTokenType(token)
         );
     }
 
 
     // ==========================================================
-    // GET USER ID
-    // ==========================================================
-
-    public UUID getUserId(String token) {
-
-        Claims claims = parse(token).getPayload();
-
-        return UUID.fromString(
-                claims.getSubject()
-        );
-    }
-
-
-    // ==========================================================
-    // GET JWT ID
-    // ==========================================================
-
-    public String getJti(String token) {
-
-        Claims claims = parse(token).getPayload();
-
-        return claims.getId();
-    }
-
-
-    // ==========================================================
-    // GET USER ROLES
-    // ==========================================================
-
-    public List<String> getRoles(String token) {
-
-        Claims claims = parse(token).getPayload();
-
-        return claims.get("roles", List.class);
-    }
-
-
-    // ==========================================================
-    // GET USER EMAIL
+    // GET EMAIL
     // ==========================================================
 
     public String getEmail(String token) {
 
-        Claims claims = parse(token).getPayload();
+        Claims claims =
+                parse(token).getPayload();
 
-        return claims.get("email", String.class);
+        return claims.get(
+                "email",
+                String.class
+        );
     }
 
+
+    // ==========================================================
+    // GET ROLES
+    // ==========================================================
+
+    public List<String> getRoles(String token) {
+
+        Claims claims =
+                parse(token).getPayload();
+
+        return claims.get(
+                "roles",
+                List.class
+        );
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
