@@ -109,6 +109,17 @@ public class User implements UserDetails {
     private Provider provider = Provider.LOCAL;
 
 
+
+  // ==========================================================
+  // OAUTH2 PROVIDER USER ID
+  // Google -> sub
+  // GitHub -> id
+  // ==========================================================
+
+    @Column(name = "provider_id")
+    private String providerId;
+
+
     // ==========================================================
     // USER ROLES
     // ==========================================================

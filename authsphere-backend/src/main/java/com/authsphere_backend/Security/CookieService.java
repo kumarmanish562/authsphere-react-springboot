@@ -95,11 +95,6 @@ public class CookieService {
                 builder.build();
 
 
-        logger.info(
-                "Refresh token cookie created successfully"
-        );
-
-
         // ======================================================
         // ADD SET-COOKIE HEADER
         // ======================================================
@@ -108,6 +103,12 @@ public class CookieService {
                 HttpHeaders.SET_COOKIE,
                 cookie.toString()
         );
+
+
+        logger.info(
+                "Refresh token cookie created successfully"
+        );
+
     }
 
 

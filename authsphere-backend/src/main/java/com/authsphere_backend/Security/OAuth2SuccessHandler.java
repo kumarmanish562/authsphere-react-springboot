@@ -7,14 +7,19 @@ import com.authsphere_backend.entities.User;
 import com.authsphere_backend.repositories.RefreshTokenRepository;
 import com.authsphere_backend.repositories.RoleRepository;
 import com.authsphere_backend.repositories.UserRepository;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import lombok.RequiredArgsConstructor;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.core.Authentication;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -35,13 +40,19 @@ public class OAuth2SuccessHandler
 
     private final UserRepository userRepository;
 
+    private final RoleRepository roleRepository;
+
     private final JwtService jwtService;
 
     private final CookieService cookieService;
 
     private final RefreshTokenRepository refreshTokenRepository;
 
-    private final RoleRepository roleRepository;
+    @Value("${app.auth.frontend.success-redirect}")
+    private String frontEndSuccessUrl;
+
+    @Value("${app.auth.frontend.failure-redirect}")
+    private String getFrontEndFailureUrl;
 
 
     // ==========================================================
@@ -55,24 +66,31 @@ public class OAuth2SuccessHandler
             Authentication authentication
     ) throws IOException, ServletException {
 
-// ==========================================================
-// GET OAUTH2 USER
-// ==========================================================
+
+        // ==========================================================
+        // 1. GET OAUTH2 USER
+        // ==========================================================
 
         OAuth2User oauth2User =
                 (OAuth2User) authentication.getPrincipal();
 
 
-// ==========================================================
-// GET PROVIDER / REGISTRATION ID
-// ==========================================================
+        // ==========================================================
+        // 2. GET PROVIDER / REGISTRATION ID
+        // ==========================================================
 
-        String registrationId = "unknown";
+        String registrationId;
 
         if (authentication instanceof OAuth2AuthenticationToken token) {
 
             registrationId =
                     token.getAuthorizedClientRegistrationId();
+
+        } else {
+
+            throw new IllegalStateException(
+                    "OAuth2 authentication token not found"
+            );
         }
 
 
@@ -82,17 +100,176 @@ public class OAuth2SuccessHandler
         );
 
         logger.info(
-                "OAuth2 attributes: {}",
+                "OAuth2 user attributes: {}",
                 oauth2User.getAttributes()
         );
 
 
+        // ==========================================================
+        // 3. VARIABLES
+        // ==========================================================
+
+        String providerId;
+        String email;
+        String name;
+        String image;
+
+        Provider provider;
+
 
         // ==========================================================
-        // 3. CHECK PROVIDER
+        // 4. GOOGLE
         // ==========================================================
 
-        if (!"google".equalsIgnoreCase(registrationId)) {
+        if ("google".equalsIgnoreCase(registrationId)) {
+
+            provider = Provider.GOOGLE;
+
+
+            // ------------------------------------------------------
+            // Google unique user ID
+            // Google -> sub
+            // ------------------------------------------------------
+
+            providerId =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "sub",
+                                            ""
+                                    )
+                    );
+
+
+            // ------------------------------------------------------
+            // Google email
+            // ------------------------------------------------------
+
+            email =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "email",
+                                            ""
+                                    )
+                    );
+
+
+            // ------------------------------------------------------
+            // Google name
+            // ------------------------------------------------------
+
+            name =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "name",
+                                            ""
+                                    )
+                    );
+
+
+            // ------------------------------------------------------
+            // Google profile image
+            // ------------------------------------------------------
+
+            image =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "picture",
+                                            ""
+                                    )
+                    );
+        }
+
+
+        // ==========================================================
+        // 5. GITHUB
+        // ==========================================================
+
+        else if ("github".equalsIgnoreCase(registrationId)) {
+
+            provider = Provider.GITHUB;
+
+
+            // ------------------------------------------------------
+            // GitHub unique user ID
+            // GitHub -> id
+            // ------------------------------------------------------
+
+            providerId =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "id",
+                                            ""
+                                    )
+                    );
+
+
+            // ------------------------------------------------------
+            // GitHub email
+            // ------------------------------------------------------
+
+            email =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "email",
+                                            ""
+                                    )
+                    );
+
+
+            // ------------------------------------------------------
+            // GitHub name
+            // If name is null -> login
+            // ------------------------------------------------------
+
+            name =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "name",
+                                            oauth2User
+                                                    .getAttributes()
+                                                    .getOrDefault(
+                                                            "login",
+                                                            ""
+                                                    )
+                                    )
+                    );
+
+
+            // ------------------------------------------------------
+            // GitHub profile image
+            // ------------------------------------------------------
+
+            image =
+                    String.valueOf(
+                            oauth2User
+                                    .getAttributes()
+                                    .getOrDefault(
+                                            "avatar_url",
+                                            ""
+                                    )
+                    );
+        }
+
+
+        // ==========================================================
+        // 6. UNSUPPORTED PROVIDER
+        // ==========================================================
+
+        else {
 
             throw new IllegalArgumentException(
                     "Unsupported OAuth2 provider: "
@@ -102,59 +279,70 @@ public class OAuth2SuccessHandler
 
 
         // ==========================================================
-        // 4. GET GOOGLE USER INFORMATION
+        // 7. VALIDATE PROVIDER ID
         // ==========================================================
 
-        String googleId =
-                String.valueOf(
-                        oauth2User
-                                .getAttributes()
-                                .getOrDefault(
-                                        "sub",
-                                        ""
-                                )
-                );
+        if (providerId == null
+                || providerId.isBlank()
+                || "null".equalsIgnoreCase(providerId)) {
 
-        String email =
-                String.valueOf(
-                        oauth2User
-                                .getAttributes()
-                                .getOrDefault(
-                                        "email",
-                                        ""
-                                )
-                );
+            throw new IllegalStateException(
+                    "OAuth2 provider ID not found"
+            );
+        }
 
-        String name =
-                String.valueOf(
-                        oauth2User
-                                .getAttributes()
-                                .getOrDefault(
-                                        "name",
-                                        ""
-                                )
-                );
 
-        String picture =
-                String.valueOf(
-                        oauth2User
-                                .getAttributes()
-                                .getOrDefault(
-                                        "picture",
-                                        ""
-                                )
-                );
+        // ==========================================================
+        // 8. VALIDATE EMAIL
+        // ==========================================================
+
+        if (email == null
+                || email.isBlank()
+                || "null".equalsIgnoreCase(email)) {
+
+            throw new IllegalStateException(
+                    "Email not provided by OAuth2 provider"
+            );
+        }
 
 
         logger.info(
-                "Google user: email={}, googleId={}",
-                email,
-                googleId
+                "OAuth2 provider      : {}",
+                provider
+        );
+
+        logger.info(
+                "OAuth2 provider ID   : {}",
+                providerId
+        );
+
+        logger.info(
+                "OAuth2 email         : {}",
+                email
+        );
+
+        logger.info(
+                "OAuth2 name          : {}",
+                name
         );
 
 
         // ==========================================================
-        // 5. FIND USER OR CREATE USER
+        // 9. FIND DEFAULT ROLE
+        // ==========================================================
+
+        Role defaultRole =
+                roleRepository
+                        .findByName("ROLE_USER")
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Default role ROLE_USER not found"
+                                )
+                        );
+
+
+        // ==========================================================
+        // 10. FIND EXISTING USER OR CREATE USER
         // ==========================================================
 
         User user =
@@ -163,42 +351,37 @@ public class OAuth2SuccessHandler
                         .orElseGet(() -> {
 
                             logger.info(
-                                    "Creating new Google user: {}",
+                                    "Creating new OAuth2 user: {}",
                                     email
                             );
 
-                            // ==================================================
-                            // FIND DEFAULT ROLE
-                            // ==================================================
-
-                            Role defaultRole =
-                                    roleRepository
-                                            .findByName("ROLE_USER")
-                                            .orElseThrow(() ->
-                                                    new IllegalStateException(
-                                                            "Default role ROLE_USER not found"
-                                                    )
-                                            );
 
                             // ==================================================
-                            // CREATE USER
+                            // CREATE NEW USER
                             // ==================================================
 
                             User newUser =
                                     User.builder()
                                             .email(email)
                                             .name(name)
-                                            .image(picture)
-                                            .provider(Provider.GOOGLE)
+                                            .image(image)
+                                            .provider(provider)
+                                            .providerId(providerId)
                                             .roles(Set.of(defaultRole))
+                                            .enable(true)
                                             .build();
 
+
                             // ==================================================
-                            // SAVE USER
+                            // SAVE NEW USER
                             // ==================================================
 
-                            return userRepository.save(newUser);
+                            return userRepository.save(
+                                    newUser
+                            );
                         });
+
+
         logger.info(
                 "Authenticated application user: {}",
                 user.getEmail()
@@ -206,7 +389,7 @@ public class OAuth2SuccessHandler
 
 
         // ==========================================================
-        // 6. CHECK USER ENABLED
+        // 11. CHECK USER ENABLED
         // ==========================================================
 
         if (!user.isEnable()) {
@@ -218,7 +401,7 @@ public class OAuth2SuccessHandler
 
 
         // ==========================================================
-        // 7. CREATE REFRESH TOKEN JTI
+        // 12. CREATE REFRESH TOKEN JTI
         // ==========================================================
 
         String jti =
@@ -226,7 +409,7 @@ public class OAuth2SuccessHandler
 
 
         // ==========================================================
-        // 8. CREATE REFRESH TOKEN DATABASE RECORD
+        // 13. CREATE REFRESH TOKEN DATABASE RECORD
         // ==========================================================
 
         Instant now =
@@ -248,13 +431,17 @@ public class OAuth2SuccessHandler
                         .build();
 
 
+        // ==========================================================
+        // 14. SAVE REFRESH TOKEN
+        // ==========================================================
+
         refreshTokenRepository.save(
                 refreshTokenEntity
         );
 
 
         // ==========================================================
-        // 9. GENERATE ACCESS TOKEN
+        // 15. GENERATE ACCESS TOKEN
         // ==========================================================
 
         String accessToken =
@@ -264,7 +451,7 @@ public class OAuth2SuccessHandler
 
 
         // ==========================================================
-        // 10. GENERATE REFRESH TOKEN
+        // 16. GENERATE REFRESH TOKEN
         // ==========================================================
 
         String refreshToken =
@@ -275,7 +462,7 @@ public class OAuth2SuccessHandler
 
 
         // ==========================================================
-        // 11. ATTACH REFRESH TOKEN COOKIE
+        // 17. ATTACH REFRESH TOKEN TO HTTPONLY COOKIE
         // ==========================================================
 
         cookieService.attachRefreshCookie(
@@ -286,34 +473,19 @@ public class OAuth2SuccessHandler
 
 
         // ==========================================================
-        // 12. PREVENT CACHE
+        // 18. PREVENT CACHE
         // ==========================================================
 
         cookieService.addNoStoreHeaders(
                 response
         );
 
-
         // ==========================================================
-        // 13. RESPONSE
+        // 19. REDIRECT TO REACT
         // ==========================================================
 
-        response.setContentType(
-                "application/json"
-        );
-
-        response.setStatus(
-                HttpServletResponse.SC_OK
-        );
-
-        response.getWriter().write(
-                """
-                {
-                    "status": 200,
-                    "message": "Google login successful",
-                    "accessToken": "%s"
-                }
-                """.formatted(accessToken)
+        response.sendRedirect(
+                frontEndSuccessUrl
         );
     }
 }
