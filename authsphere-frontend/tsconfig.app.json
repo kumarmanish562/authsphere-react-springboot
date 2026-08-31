@@ -42,7 +42,9 @@
 
     "noUnusedParameters": true,
 
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    "noUncheckedSideEffectImports": false
   },
 
   "include": [
