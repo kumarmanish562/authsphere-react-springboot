@@ -368,7 +368,7 @@ public class OAuth2SuccessHandler
                                             .provider(provider)
                                             .providerId(providerId)
                                             .roles(Set.of(defaultRole))
-                                            .enable(true)
+                                            .enabled(true)
                                             .build();
 
 
@@ -392,7 +392,7 @@ public class OAuth2SuccessHandler
         // 11. CHECK USER ENABLED
         // ==========================================================
 
-        if (!user.isEnable()) {
+        if (!user.isEnabled()) {
 
             throw new IllegalStateException(
                     "User account is disabled"

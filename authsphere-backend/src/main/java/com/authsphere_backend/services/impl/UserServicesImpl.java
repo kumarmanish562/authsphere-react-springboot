@@ -7,7 +7,9 @@ import com.authsphere_backend.exceptions.ResourceNotFoundException;
 import com.authsphere_backend.helpers.UserHelper;
 import com.authsphere_backend.repositories.UserRepository;
 import com.authsphere_backend.services.UserService;
+
 import lombok.RequiredArgsConstructor;
+
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,6 +82,10 @@ public class UserServicesImpl implements UserService {
         );
 
 
+        // Set account enabled
+        user.setEnabled(true);
+
+
         // TODO: Assign default role to user
 
 
@@ -107,8 +113,6 @@ public class UserServicesImpl implements UserService {
         // Find user by email
         User user = userRepository
                 .findByEmail(email)
-
-                // Throw exception when user is not found
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "User not found with given email id : "
@@ -142,10 +146,8 @@ public class UserServicesImpl implements UserService {
 
 
         // Find existing user
-        User exitingUser = userRepository
+        User existingUser = userRepository
                 .findById(uId)
-
-                // Throw exception when user is not found
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "User not found with given id"
@@ -156,7 +158,7 @@ public class UserServicesImpl implements UserService {
         // Update user name
         if (userDto.getName() != null) {
 
-            exitingUser.setName(
+            existingUser.setName(
                     userDto.getName()
             );
         }
@@ -165,7 +167,7 @@ public class UserServicesImpl implements UserService {
         // TODO: Implement secure password update logic
         if (userDto.getPassword() != null) {
 
-            exitingUser.setPassword(
+            existingUser.setPassword(
                     userDto.getPassword()
             );
         }
@@ -174,7 +176,7 @@ public class UserServicesImpl implements UserService {
         // Update profile image
         if (userDto.getImage() != null) {
 
-            exitingUser.setImage(
+            existingUser.setImage(
                     userDto.getImage()
             );
         }
@@ -183,21 +185,21 @@ public class UserServicesImpl implements UserService {
         // Update authentication provider
         if (userDto.getProvider() != null) {
 
-            exitingUser.setProvider(
+            existingUser.setProvider(
                     userDto.getProvider()
             );
         }
 
 
         // Update account status
-        exitingUser.setEnable(
-                userDto.isEnable()
+        existingUser.setEnabled(
+                userDto.isEnabled()
         );
 
 
         // Save updated user
         User updatedUser =
-                userRepository.save(exitingUser);
+                userRepository.save(existingUser);
 
 
         // Convert User entity into UserDto
@@ -224,8 +226,6 @@ public class UserServicesImpl implements UserService {
         // Find user
         User user = userRepository
                 .findById(uId)
-
-                // Throw exception when user is not found
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "User not found with given id"
@@ -254,8 +254,6 @@ public class UserServicesImpl implements UserService {
         // Find user by UUID
         User user = userRepository
                 .findById(uId)
-
-                // Throw exception when user is not found
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "User not found with given id"
@@ -284,19 +282,13 @@ public class UserServicesImpl implements UserService {
         // Get all users from database
         return userRepository
                 .findAll()
-
-                // Convert List<User> into Stream<User>
                 .stream()
-
-                // Convert every User into UserDto
                 .map(user ->
                         modelMapper.map(
                                 user,
                                 UserDto.class
                         )
                 )
-
-                // Convert Stream into List<UserDto>
                 .toList();
     }
 }

@@ -3,6 +3,8 @@ package com.authsphere_backend.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Getter
@@ -35,4 +37,13 @@ public class Role {
             length = 100
     )
     private String name;
+
+
+    // ==========================================
+    // USERS
+    // ==========================================
+
+    @ManyToMany(mappedBy = "roles")
+    @Builder.Default
+    private Set<User> users = new HashSet<>();
 }

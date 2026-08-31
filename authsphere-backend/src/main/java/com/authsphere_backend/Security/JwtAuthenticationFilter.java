@@ -254,7 +254,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                  * ==================================
                                  */
 
-                                if (!user.isEnable()) {
+                                if (!user.isEnabled()) {
 
                                     logger.warn(
                                             "Disabled user attempted access: {}",

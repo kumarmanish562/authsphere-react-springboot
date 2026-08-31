@@ -2,10 +2,7 @@ package com.authsphere_backend.controllers;
 
 import com.authsphere_backend.Security.CookieService;
 import com.authsphere_backend.Security.JwtService;
-import com.authsphere_backend.dtos.LoginRequest;
-import com.authsphere_backend.dtos.RefreshTokenRequest;
-import com.authsphere_backend.dtos.TokenResponse;
-import com.authsphere_backend.dtos.UserDto;
+import com.authsphere_backend.dtos.*;
 import com.authsphere_backend.entities.RefreshToken;
 import com.authsphere_backend.entities.User;
 import com.authsphere_backend.repositories.RefreshTokenRepository;
@@ -36,9 +33,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.http.HttpResponse;
+
 import java.time.Instant;
-import java.util.ArrayList;
+
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,13 +68,13 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<UserDto> registerUser(
-            @RequestBody UserDto userDto
+            @RequestBody RegisterRequest request
     ) {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(
-                        authService.registerUser(userDto)
+                        authService.registerUser(request)
                 );
     }
 
@@ -529,7 +526,7 @@ public class AuthController {
         // 3. CHECK USER ENABLED
         // ======================================================
 
-        if (!user.isEnable()) {
+        if (!user.isEnabled()) {
 
             throw new DisabledException(
                     "User is disabled"

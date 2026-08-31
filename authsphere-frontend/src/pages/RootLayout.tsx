@@ -1,14 +1,20 @@
-
-import Navbar from '@/components/Navbar'
-import { Outlet } from 'react-router'
+import { Outlet } from "react-router";
+import Navbar from "@/components/Navbar";
 
 function RootLayout() {
   return (
-    <div>
+    <div className="min-h-screen bg-background text-foreground">
+
+      {/* Public Navbar */}
       <Navbar />
-      <Outlet />
+
+      {/* Public Page */}
+      <main>
+        <Outlet />
+      </main>
+
     </div>
-  )
+  );
 }
 
-export default RootLayout
+export default RootLayout;

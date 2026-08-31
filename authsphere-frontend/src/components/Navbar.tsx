@@ -13,7 +13,7 @@ function Navbar() {
           onClick={() => navigate("/")}
           className="flex cursor-pointer items-center gap-2 sm:gap-3"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/40 text-xs font-bold text-primary-foreground shadow-sm sm:h-9 sm:w-9 sm:text-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-primary to-primary/40 text-xs font-bold text-primary-foreground shadow-sm sm:h-9 sm:w-9 sm:text-sm">
             AS
           </div>
 

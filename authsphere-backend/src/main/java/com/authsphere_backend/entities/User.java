@@ -28,7 +28,6 @@ import java.util.UUID;
 @Table(name = "users")
 public class User implements UserDetails {
 
-
     // ==========================================================
     // PRIMARY KEY
     // ==========================================================
@@ -85,7 +84,7 @@ public class User implements UserDetails {
 
     @Column(name = "enabled")
     @Builder.Default
-    private boolean enable = true;
+    private boolean enabled = true;
 
 
     // ==========================================================
@@ -109,12 +108,11 @@ public class User implements UserDetails {
     private Provider provider = Provider.LOCAL;
 
 
-
-  // ==========================================================
-  // OAUTH2 PROVIDER USER ID
-  // Google -> sub
-  // GitHub -> id
-  // ==========================================================
+    // ==========================================================
+    // OAUTH2 PROVIDER USER ID
+    // Google -> sub
+    // GitHub -> id
+    // ==========================================================
 
     @Column(name = "provider_id")
     private String providerId;
@@ -156,6 +154,11 @@ public class User implements UserDetails {
         if (updatedAt == null) {
             updatedAt = now;
         }
+
+        // Make sure new users are enabled
+        // if no explicit value was provided.
+        // Primitive boolean already defaults to false,
+        // so this is handled through the field initializer.
     }
 
 
@@ -241,6 +244,6 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() {
 
-        return this.enable;
+        return this.enabled;
     }
 }
