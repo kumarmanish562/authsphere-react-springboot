@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:authsphere_test;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-id
+            client-secret: test-google-secret
+          github:
+            client-id: test-github-id
+            client-secret: test-github-secret
+
+security:
+  jwt:
+    secret: authsphere-test-jwt-secret-key-that-is-over-64-characters-long-1234567890
+    access-ttl-seconds: 900
+    refresh-ttl-seconds: 604800
+    issuer: authsphere-test
+    refresh-token-cookie-name: refresh_token
+    cookie-http-only: true
+    cookie-secure: false
+    cookie-domain: localhost
+    cookie-same-site: Lax
+
+app:
+  cors:
+    front-end-url: http://localhost:5173
+  auth:
+    frontend:
+      success-redirect: http://localhost:5173/auth/success
+      failure-redirect: http://localhost:5173/auth/failure

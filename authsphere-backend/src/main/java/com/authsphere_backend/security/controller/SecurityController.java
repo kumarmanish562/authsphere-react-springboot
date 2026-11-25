@@ -40,6 +40,22 @@ public class SecurityController {
         return ResponseEntity.ok(userAccountService.toggleTwoFactor(user.getId(), enabled, request));
     }
 
+    @PostMapping("/two-factor/setup")
+    public ResponseEntity<Map<String, String>> setupTwoFactor(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(userAccountService.setupTwoFactor(user.getId()));
+    }
+
+    @PostMapping("/two-factor/verify")
+    public ResponseEntity<UserDto> verifyTwoFactor(
+            @AuthenticationPrincipal User user,
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.ok(
+                userAccountService.verifyAndEnableTwoFactor(user.getId(), body.get("code"), request)
+        );
+    }
+
     @PostMapping("/verify-email")
     public ResponseEntity<UserDto> verifyEmail(
             @AuthenticationPrincipal User user,

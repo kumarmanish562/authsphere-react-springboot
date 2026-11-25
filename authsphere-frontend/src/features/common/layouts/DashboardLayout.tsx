@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
 
 import {
@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
 import useAuth from "@/features/auth/store/authStore";
+import { refreshToken } from "@/features/auth/services/AuthService";
 
 
 // =====================================================
@@ -37,6 +38,18 @@ import useAuth from "@/features/auth/store/authStore";
 function Userlayout() {
   const checkLogin = useAuth(
     (state) => state.checkLogin
+  );
+
+  const accessToken = useAuth(
+    (state) => state.accessToken
+  );
+
+  const authStatus = useAuth(
+    (state) => state.authStatus
+  );
+
+  const changeLocalLoginData = useAuth(
+    (state) => state.changeLocalLoginData
   );
 
   const user = useAuth(
@@ -51,6 +64,18 @@ function Userlayout() {
 
   const [mobileOpen, setMobileOpen] =
     useState(false);
+
+  useEffect(() => {
+    if (authStatus && !accessToken) {
+      refreshToken()
+        .then((res) => {
+          changeLocalLoginData(res.accessToken, res.user, true);
+        })
+        .catch(() => {
+          logout(true);
+        });
+    }
+  }, [authStatus, accessToken, changeLocalLoginData, logout]);
 
 
   // ===================================================

@@ -369,14 +369,16 @@ public class OAuth2SuccessHandler
         // 10. FIND EXISTING USER OR CREATE USER
         // ==========================================================
 
+        final String finalEmail = email;
+
         User user =
                 userRepository
-                        .findByEmail(email)
+                        .findByEmail(finalEmail)
                         .orElseGet(() -> {
 
                             logger.info(
                                     "Creating new OAuth2 user: {}",
-                                    email
+                                    finalEmail
                             );
 
 
@@ -386,7 +388,7 @@ public class OAuth2SuccessHandler
 
                             User newUser =
                                     User.builder()
-                                            .email(email)
+                                            .email(finalEmail)
                                             .name(name)
                                             .image(image)
                                             .provider(provider)

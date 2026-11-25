@@ -2,6 +2,7 @@ package com.authsphere_backend.user.service;
 
 
 import com.authsphere_backend.user.service.UserAccountServiceImpl;
+import com.authsphere_backend.auth.security.TotpService;
 import com.authsphere_backend.user.dto.ChangePasswordRequest;
 import com.authsphere_backend.user.dto.UpdateProfileRequest;
 import com.authsphere_backend.user.dto.UserDto;
@@ -31,6 +32,7 @@ public class UserAccountServiceImpl implements UserAccountService {
     private final UserSettingsRepository settingsRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final TotpService totpService;
     private final ModelMapper modelMapper;
 
     @Override
@@ -120,11 +122,48 @@ public class UserAccountServiceImpl implements UserAccountService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         user.setTwoFactorEnabled(enabled);
+        if (!enabled) {
+            user.setTotpSecret(null);
+        }
         User saved = userRepository.save(user);
 
         auditLogService.log(saved, "TWO_FACTOR_UPDATED",
                 enabled ? "Enabled two-factor authentication" : "Disabled two-factor authentication",
                 enabled ? "SUCCESS" : "WARNING", httpRequest);
+
+        return modelMapper.map(saved, UserDto.class);
+    }
+
+    @Override
+    @Transactional
+    public java.util.Map<String, String> setupTwoFactor(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        String secret = totpService.generateSecret();
+        user.setTotpSecret(secret);
+        userRepository.save(user);
+
+        String otpAuthUri = totpService.buildOtpAuthUri(user.getEmail(), secret);
+        return java.util.Map.of("secret", secret, "otpAuthUri", otpAuthUri);
+    }
+
+    @Override
+    @Transactional
+    public UserDto verifyAndEnableTwoFactor(UUID userId, String code, HttpServletRequest httpRequest) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!totpService.verifyCode(user.getTotpSecret(), code)) {
+            throw new BadCredentialsException("Invalid 6-digit verification code");
+        }
+
+        user.setTwoFactorEnabled(true);
+        User saved = userRepository.save(user);
+
+        auditLogService.log(saved, "TWO_FACTOR_ENABLED",
+                "Verified and enabled TOTP two-factor authentication",
+                "SUCCESS", httpRequest);
 
         return modelMapper.map(saved, UserDto.class);
     }

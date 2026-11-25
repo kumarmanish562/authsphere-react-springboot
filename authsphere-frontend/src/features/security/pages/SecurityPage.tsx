@@ -5,9 +5,13 @@ import toast from "react-hot-toast";
 import useAuth from "@/features/auth/store/authStore";
 import {
   getSecurityOverview,
+  setupTwoFactor,
   toggleTwoFactor,
   verifyEmail,
+  verifyTwoFactor,
 } from "@/features/security/services/SecurityService";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   getActiveSessions,
   revokeOtherSessions,
@@ -72,7 +76,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 const SecurityPage: React.FC = () => {
@@ -90,6 +93,12 @@ const SecurityPage: React.FC = () => {
     theme: "dark",
   });
   const [loading, setLoading] = useState(true);
+  const [totpModalOpen, setTotpModalOpen] = useState(false);
+  const [totpSecret, setTotpSecret] = useState("");
+  const [totpUri, setTotpUri] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [verifyingTotp, setVerifyingTotp] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -114,13 +123,46 @@ const SecurityPage: React.FC = () => {
   }, [loadData]);
 
   const handleToggleTwoFactor = async (enabled: boolean) => {
+    if (enabled) {
+      try {
+        const res = await setupTwoFactor();
+        setTotpSecret(res.secret);
+        setTotpUri(res.otpAuthUri);
+        setTotpCode("");
+        setTotpModalOpen(true);
+      } catch {
+        toast.error("Failed to initialize 2FA setup.");
+      }
+      return;
+    }
+
     try {
-      const updatedUser = await toggleTwoFactor(enabled);
+      const updatedUser = await toggleTwoFactor(false);
       setUser(updatedUser);
       await loadData();
-      toast.success(enabled ? "Two-factor authentication enabled." : "Two-factor authentication disabled.");
+      toast.success("Two-factor authentication disabled.");
     } catch {
-      toast.error("Failed to update two-factor authentication.");
+      toast.error("Failed to disable two-factor authentication.");
+    }
+  };
+
+  const handleVerifyTotp = async () => {
+    if (!totpCode.trim() || totpCode.trim().length !== 6) {
+      toast.error("Please enter the 6-digit code from your authenticator app.");
+      return;
+    }
+
+    try {
+      setVerifyingTotp(true);
+      const updatedUser = await verifyTwoFactor(totpCode.trim());
+      setUser(updatedUser);
+      setTotpModalOpen(false);
+      await loadData();
+      toast.success("Two-factor authentication verified and enabled!");
+    } catch {
+      toast.error("Invalid 6-digit verification code.");
+    } finally {
+      setVerifyingTotp(false);
     }
   };
 
@@ -1020,18 +1062,17 @@ const SecurityPage: React.FC = () => {
                   </p>
                 </div>
 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                    >
-                      <Trash2 size={16} className="mr-2" />
-                      Delete account
-                    </Button>
-                  </DialogTrigger>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  Delete account
+                </Button>
 
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                   <DialogContent className="border-white/10 bg-[#090909] text-white">
                     <DialogHeader>
                       <DialogTitle>
@@ -1069,6 +1110,57 @@ const SecurityPage: React.FC = () => {
           </Card>
         </section>
       </main>
+
+      <Dialog open={totpModalOpen} onOpenChange={setTotpModalOpen}>
+        <DialogContent className="border-white/10 bg-[#0d0d0d] text-white">
+          <DialogHeader>
+            <DialogTitle>Setup Two-Factor Authentication</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Scan this QR code with Google Authenticator or Authy, then enter the 6-digit code below.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 py-2">
+            {totpUri && (
+              <div className="rounded-xl bg-white p-3">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(totpUri)}`}
+                  alt="TOTP QR Code"
+                  className="h-40 w-40"
+                />
+              </div>
+            )}
+
+            <div className="w-full space-y-1 text-center">
+              <p className="text-xs text-zinc-500">Or enter this secret key manually:</p>
+              <code className="block rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs tracking-widest text-cyan-400">
+                {totpSecret}
+              </code>
+            </div>
+
+            <div className="w-full space-y-2">
+              <Label htmlFor="totp-code">6-Digit Verification Code</Label>
+              <Input
+                id="totp-code"
+                maxLength={6}
+                placeholder="123456"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                className="border-white/10 bg-white/[0.03] text-center text-lg tracking-widest"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTotpModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleVerifyTotp} disabled={verifyingTotp}>
+              {verifyingTotp ? "Verifying..." : "Verify & Enable"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,0 +1,52 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: authsphere-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: authsphere
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./authsphere-backend
+    container_name: authsphere-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:mysql://mysql:3306/authsphere?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      FRONTEND_URL: http://localhost:5173
+      OAUTH_SUCCESS_REDIRECT: http://localhost:5173/auth/success
+      OAUTH_FAILURE_REDIRECT: http://localhost:5173/auth/failure
+
+  frontend:
+    build:
+      context: ./authsphere-frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8083/api/m1
+        VITE_BASE_URL: http://localhost:8083
+    container_name: authsphere-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql_data:

@@ -28,6 +28,7 @@ import { toast } from "sonner";
 interface LoginData {
   email: string;
   password: string;
+  otpCode?: string;
 }
 
 
@@ -73,7 +74,10 @@ function LoginPage() {
   const [data, setData] = useState<LoginData>({
     email: "",
     password: "",
+    otpCode: "",
   });
+
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
 
 
   // ===================================================
@@ -238,12 +242,15 @@ function LoginPage() {
       // ---------------------------------------------
 
       if (error instanceof Error) {
-
-        setErrorMessage(
-          error.message ||
-          "Invalid email or password."
-        );
-
+        if (error.message === "2FA_REQUIRED") {
+          setRequiresTwoFactor(true);
+          setErrorMessage("Please enter the 6-digit code from your authenticator app.");
+        } else {
+          setErrorMessage(
+            error.message ||
+            "Invalid email or password."
+          );
+        }
       } else {
 
         setErrorMessage(
@@ -747,11 +754,7 @@ function LoginPage() {
                 <button
                   type="button"
                   disabled={authLoading}
-                  onClick={() =>
-                    setErrorMessage(
-                      "Password recovery is not available yet."
-                    )
-                  }
+                  onClick={() => navigate("/forgot-password")}
                   className="
                     cursor-pointer
                     text-xs
@@ -854,6 +857,23 @@ function LoginPage() {
 
             </div>
 
+            {requiresTwoFactor && (
+              <div className="space-y-2">
+                <Label htmlFor="otpCode">Authenticator Code (2FA)</Label>
+                <Input
+                  id="otpCode"
+                  name="otpCode"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="Enter 6-digit OTP"
+                  value={data.otpCode || ""}
+                  onChange={handleInputChange}
+                  disabled={authLoading}
+                  className="h-11 bg-background/60 tracking-widest"
+                />
+              </div>
+            )}
 
             {/* =================================================
                 LOGIN BUTTON

@@ -4,6 +4,7 @@ package com.authsphere_backend.common.config;
 import com.authsphere_backend.common.config.AppConstants;
 import com.authsphere_backend.common.config.SecurityConfig;
 import com.authsphere_backend.auth.security.JwtAuthenticationFilter;
+import com.authsphere_backend.auth.security.RateLimitFilter;
 import com.authsphere_backend.common.dtos.ApiError;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -45,13 +46,19 @@ public class SecurityConfig {
 
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final AuthenticationSuccessHandler successHandler;
 
     @Value("${app.auth.frontend.failure-redirect:http://localhost:5173/auth/failure}")
     private String failureRedirectUrl;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AuthenticationSuccessHandler successHandler) {
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            RateLimitFilter rateLimitFilter,
+            AuthenticationSuccessHandler successHandler
+    ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.rateLimitFilter = rateLimitFilter;
         this.successHandler = successHandler;
     }
 
@@ -169,6 +176,10 @@ public class SecurityConfig {
                         )
                 )
 
+                .addFilterBefore(
+                        rateLimitFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class

@@ -21,6 +21,9 @@ import Userprofile from "./features/user/pages/ProfilePage";
 
 import OAuthSuccess from "./features/auth/pages/OAuthSuccess";
 import OAuthFailure from "./features/auth/pages/OAuthFailure";
+import ForgotPasswordPage from "./features/auth/pages/ForgotPasswordPage";
+import ResetPasswordPage from "./features/auth/pages/ResetPasswordPage";
+import VerifyEmailPage from "./features/auth/pages/VerifyEmailPage";
 
 import SecurityPage from "./features/security/pages/SecurityPage";
 import SessionsPage from "./features/sessions/pages/SessionsPage";
@@ -129,6 +132,21 @@ createRoot(
       <Route
         path="/auth/failure"
         element={<OAuthFailure />}
+      />
+
+      <Route
+        path="/forgot-password"
+        element={<ForgotPasswordPage />}
+      />
+
+      <Route
+        path="/reset-password"
+        element={<ResetPasswordPage />}
+      />
+
+      <Route
+        path="/verify-email"
+        element={<VerifyEmailPage />}
       />
 
     </Routes>

@@ -98,6 +98,16 @@ public class User implements UserDetails {
     @Builder.Default
     private boolean twoFactorEnabled = false;
 
+    @Column(name = "totp_secret", length = 128)
+    private String totpSecret;
+
+    @Column(name = "failed_login_attempts")
+    @Builder.Default
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "lock_until")
+    private Instant lockUntil;
+
 
     // ==========================================================
     // TIMESTAMPS
@@ -235,8 +245,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-
-        return true;
+        return lockUntil == null || lockUntil.isBefore(Instant.now());
     }
 
 

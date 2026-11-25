@@ -31,7 +31,6 @@ import {
   Tablet,
   Trash2,
   Wifi,
-  X,
 } from "lucide-react";
 
 import {
@@ -707,21 +706,21 @@ export default function SessionsPage() {
 
                       <DropdownMenu>
 
-                        <DropdownMenuTrigger asChild>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="
-                              text-zinc-500
-                              hover:bg-white/[0.06]
-                              hover:text-white
-                            "
-                          >
-                            <MoreHorizontal className="h-5 w-5" />
-                          </Button>
-
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="
+                                text-zinc-500
+                                hover:bg-white/[0.06]
+                                hover:text-white
+                              "
+                            >
+                              <MoreHorizontal className="h-5 w-5" />
+                            </Button>
+                          }
+                        />
 
 
                         <DropdownMenuContent

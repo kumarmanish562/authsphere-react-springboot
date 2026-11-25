@@ -1,7 +1,5 @@
 package com.authsphere_backend.auth.dto;
 
-
-import com.authsphere_backend.auth.dto.LoginRequest;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
@@ -11,6 +9,11 @@ public record LoginRequest(
         String email,
 
         @NotBlank(message = "Password is required")
-        String password
+        String password,
+
+        String otpCode
 ) {
+    public LoginRequest(String email, String password) {
+        this(email, password, null);
+    }
 }

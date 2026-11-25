@@ -32,7 +32,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 import {
@@ -191,13 +190,12 @@ export default function ApiAccessPage() {
               </div>
             </div>
 
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create key
+            </Button>
+
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create key
-                </Button>
-              </DialogTrigger>
               <DialogContent className="border-white/10 bg-[#0d0d0d] text-white">
                 <DialogHeader>
                   <DialogTitle>Generate API Key</DialogTitle>

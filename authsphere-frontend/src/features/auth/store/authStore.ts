@@ -238,29 +238,23 @@ const useAuth = create<AuthState>()(
       // =================================================
 
       checkLogin: () => {
-
-        const {
-          accessToken,
-          authStatus,
-        } = get();
-
-
-        return Boolean(
-          accessToken &&
-          authStatus
-        );
-
+        const { authStatus } = get();
+        return Boolean(authStatus);
       },
 
     }),
 
 
     // ===================================================
-    // ZUSTAND PERSIST
+    // ZUSTAND PERSIST (In-Memory Access Token Only)
     // ===================================================
 
     {
       name: LOCAL_KEY,
+      partialize: (state) => ({
+        user: state.user,
+        authStatus: state.authStatus,
+      }),
     }
 
   )

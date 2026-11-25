@@ -18,3 +18,21 @@ export const verifyEmail = async (): Promise<User> => {
   const { data } = await apiClient.post<User>("/security/verify-email");
   return data;
 };
+
+export const setupTwoFactor = async (): Promise<{
+  secret: string;
+  otpAuthUri: string;
+}> => {
+  const { data } = await apiClient.post<{
+    secret: string;
+    otpAuthUri: string;
+  }>("/security/two-factor/setup");
+  return data;
+};
+
+export const verifyTwoFactor = async (code: string): Promise<User> => {
+  const { data } = await apiClient.post<User>("/security/two-factor/verify", {
+    code,
+  });
+  return data;
+};

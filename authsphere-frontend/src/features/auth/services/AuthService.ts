@@ -248,3 +248,38 @@ export const getCurrentUser = async (): Promise<User> => {
   const { data } = await apiClient.get<User>("/users/me");
   return data;
 };
+
+export const forgotPassword = async (email: string): Promise<string> => {
+  const { data } = await apiClient.post<{ message: string }>(
+    "/auth/forgot-password",
+    { email }
+  );
+  return data.message;
+};
+
+export const resetPassword = async (
+  token: string,
+  newPassword: string
+): Promise<string> => {
+  const { data } = await apiClient.post<{ message: string }>(
+    "/auth/reset-password",
+    { token, newPassword }
+  );
+  return data.message;
+};
+
+export const verifyEmailToken = async (token: string): Promise<string> => {
+  const { data } = await apiClient.post<{ message: string }>(
+    "/auth/verify-email",
+    { token }
+  );
+  return data.message;
+};
+
+export const resendVerification = async (email: string): Promise<string> => {
+  const { data } = await apiClient.post<{ message: string }>(
+    "/auth/resend-verification",
+    { email }
+  );
+  return data.message;
+};

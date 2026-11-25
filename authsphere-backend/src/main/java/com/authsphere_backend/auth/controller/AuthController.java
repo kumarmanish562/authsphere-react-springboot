@@ -1,10 +1,17 @@
 package com.authsphere_backend.auth.controller;
 
 
+import com.authsphere_backend.auth.dto.ForgotPasswordRequest;
 import com.authsphere_backend.auth.dto.LoginRequest;
 import com.authsphere_backend.auth.dto.RefreshTokenRequest;
 import com.authsphere_backend.auth.dto.RegisterRequest;
+import com.authsphere_backend.auth.dto.ResetPasswordRequest;
 import com.authsphere_backend.auth.dto.TokenResponse;
+import com.authsphere_backend.auth.dto.VerifyEmailRequest;
+import com.authsphere_backend.auth.entity.VerificationToken;
+import com.authsphere_backend.auth.repository.VerificationTokenRepository;
+import com.authsphere_backend.auth.security.TotpService;
+import com.authsphere_backend.common.service.EmailService;
 import com.authsphere_backend.user.dto.UserDto;
 import com.authsphere_backend.auth.security.CookieService;
 import com.authsphere_backend.auth.security.JwtService;
@@ -33,18 +40,22 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import org.springframework.security.core.Authentication;
 
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,6 +83,14 @@ public class AuthController {
     private final SessionService sessionService;
 
     private final AuditLogService auditLogService;
+
+    private final VerificationTokenRepository verificationTokenRepository;
+
+    private final EmailService emailService;
+
+    private final TotpService totpService;
+
+    private final PasswordEncoder passwordEncoder;
 
 
     // ==========================================================
@@ -535,40 +554,46 @@ public class AuthController {
             HttpServletRequest request,
             HttpServletResponse response
     ) {
+        User user = userRepository.findByEmail(loginRequest.email())
+                .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
 
+        if (!user.isAccountNonLocked()) {
+            throw new LockedException("Account is temporarily locked due to multiple failed login attempts. Try again later.");
+        }
 
-        // ======================================================
-        // 1. AUTHENTICATE USER
-        // ======================================================
-
-        authenticate(loginRequest);
-
-
-        // ======================================================
-        // 2. FIND USER
-        // ======================================================
-
-        User user =
-                userRepository
-                        .findByEmail(
-                                loginRequest.email()
-                        )
-                        .orElseThrow(() ->
-                                new BadCredentialsException(
-                                        "Invalid username or password"
-                                )
-                        );
-
-
-        // ======================================================
-        // 3. CHECK USER ENABLED
-        // ======================================================
+        try {
+            authenticate(loginRequest);
+        } catch (BadCredentialsException e) {
+            int attempts = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(attempts);
+            if (attempts >= 5) {
+                user.setLockUntil(Instant.now().plus(15, ChronoUnit.MINUTES));
+                auditLogService.log(user, "ACCOUNT_LOCKED", "Account locked for 15 minutes after 5 failed login attempts", "FAILURE", request);
+            } else {
+                auditLogService.log(user, "LOGIN_FAILED", "Failed login attempt (" + attempts + "/5)", "FAILURE", request);
+            }
+            userRepository.save(user);
+            throw e;
+        }
 
         if (!user.isEnabled()) {
+            throw new DisabledException("User is disabled");
+        }
 
-            throw new DisabledException(
-                    "User is disabled"
-            );
+        if (user.isTwoFactorEnabled()) {
+            if (loginRequest.otpCode() == null || loginRequest.otpCode().isBlank()) {
+                throw new BadCredentialsException("2FA_REQUIRED");
+            }
+            if (!totpService.verifyCode(user.getTotpSecret(), loginRequest.otpCode().trim())) {
+                auditLogService.log(user, "LOGIN_FAILED", "Invalid 2FA verification code", "FAILURE", request);
+                throw new BadCredentialsException("Invalid 2FA verification code");
+            }
+        }
+
+        if (user.getFailedLoginAttempts() > 0 || user.getLockUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockUntil(null);
+            userRepository.save(user);
         }
 
 
@@ -716,6 +741,110 @@ public class AuthController {
         }
     }
 
+    // ==========================================================
+    // FORGOT PASSWORD & RESET PASSWORD
+    // ==========================================================
 
+    @PostMapping("/forgot-password")
+    @Transactional
+    public ResponseEntity<Map<String, String>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest body,
+            HttpServletRequest request
+    ) {
+        userRepository.findByEmail(body.email().trim()).ifPresent(user -> {
+            String token = UUID.randomUUID().toString();
+            verificationTokenRepository.save(VerificationToken.builder()
+                    .token(token)
+                    .type(VerificationToken.TokenType.PASSWORD_RESET)
+                    .user(user)
+                    .expiresAt(Instant.now().plus(15, ChronoUnit.MINUTES))
+                    .build());
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), token);
+            auditLogService.log(user, "PASSWORD_RESET_REQUESTED", "Requested password reset link", "SUCCESS", request);
+        });
+
+        return ResponseEntity.ok(Map.of(
+                "message", "If an account exists with this email, a password reset link has been sent."
+        ));
+    }
+
+    @PostMapping("/reset-password")
+    @Transactional
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest body,
+            HttpServletRequest request
+    ) {
+        VerificationToken vToken = verificationTokenRepository
+                .findByTokenAndType(body.token().trim(), VerificationToken.TokenType.PASSWORD_RESET)
+                .orElseThrow(() -> new BadCredentialsException("Invalid or expired reset token"));
+
+        if (vToken.isUsed() || vToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new BadCredentialsException("Reset token has expired or already been used");
+        }
+
+        User user = vToken.getUser();
+        user.setPassword(passwordEncoder.encode(body.newPassword()));
+        user.setFailedLoginAttempts(0);
+        user.setLockUntil(null);
+        userRepository.save(user);
+
+        vToken.setUsed(true);
+        verificationTokenRepository.save(vToken);
+
+        auditLogService.log(user, "PASSWORD_RESET", "Password reset successfully via email token", "SUCCESS", request);
+
+        return ResponseEntity.ok(Map.of("message", "Password has been reset successfully."));
+    }
+
+    // ==========================================================
+    // EMAIL VERIFICATION
+    // ==========================================================
+
+    @PostMapping("/verify-email")
+    @Transactional
+    public ResponseEntity<Map<String, String>> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest body,
+            HttpServletRequest request
+    ) {
+        VerificationToken vToken = verificationTokenRepository
+                .findByTokenAndType(body.token().trim(), VerificationToken.TokenType.EMAIL_VERIFY)
+                .orElseThrow(() -> new BadCredentialsException("Invalid verification token"));
+
+        if (vToken.isUsed() || vToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new BadCredentialsException("Verification token has expired or already been used");
+        }
+
+        User user = vToken.getUser();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+
+        vToken.setUsed(true);
+        verificationTokenRepository.save(vToken);
+
+        auditLogService.log(user, "EMAIL_VERIFIED", "Verified primary email address", "SUCCESS", request);
+
+        return ResponseEntity.ok(Map.of("message", "Email verified successfully."));
+    }
+
+    @PostMapping("/resend-verification")
+    @Transactional
+    public ResponseEntity<Map<String, String>> resendVerification(
+            @Valid @RequestBody ForgotPasswordRequest body
+    ) {
+        userRepository.findByEmail(body.email().trim()).ifPresent(user -> {
+            if (!user.isEmailVerified()) {
+                String token = UUID.randomUUID().toString();
+                verificationTokenRepository.save(VerificationToken.builder()
+                        .token(token)
+                        .type(VerificationToken.TokenType.EMAIL_VERIFY)
+                        .user(user)
+                        .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                        .build());
+                emailService.sendVerificationEmail(user.getEmail(), user.getName(), token);
+            }
+        });
+
+        return ResponseEntity.ok(Map.of("message", "Verification email sent if account is unverified."));
+    }
 
 }

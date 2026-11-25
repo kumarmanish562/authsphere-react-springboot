@@ -9,6 +9,7 @@ import com.authsphere_backend.user.dto.UserDto;
 import com.authsphere_backend.user.dto.UserSettingsDto;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.Map;
 import java.util.UUID;
 
 public interface UserAccountService {
@@ -24,6 +25,10 @@ public interface UserAccountService {
     UserSettingsDto updateSettings(UUID userId, UserSettingsDto request, HttpServletRequest httpRequest);
 
     UserDto toggleTwoFactor(UUID userId, boolean enabled, HttpServletRequest httpRequest);
+
+    Map<String, String> setupTwoFactor(UUID userId);
+
+    UserDto verifyAndEnableTwoFactor(UUID userId, String code, HttpServletRequest httpRequest);
 
     UserDto verifyEmail(UUID userId, HttpServletRequest httpRequest);
 }
