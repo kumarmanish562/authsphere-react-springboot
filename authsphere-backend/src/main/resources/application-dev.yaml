@@ -1,0 +1,54 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/authsphere?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+            scope:
+              - email
+              - profile
+          github:
+            client-id: ${GITHUB_CLIENT_ID:your-github-client-id}
+            client-secret: ${GITHUB_CLIENT_SECRET:your-github-client-secret}
+            scope:
+              - user:email
+              - read:user
+
+server:
+  port: ${SERVER_PORT:8083}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:authsphere-super-secret-production-jwt-key-that-is-at-least-64-characters-long-123456}
+    access-ttl-seconds: ${JWT_ACCESS_TTL:900}
+    refresh-ttl-seconds: ${JWT_REFRESH_TTL:604800}
+    issuer: ${JWT_ISSUER:authsphere-api}
+    refresh-token-cookie-name: ${JWT_COOKIE_NAME:refresh_token}
+    cookie-http-only: true
+    cookie-secure: ${COOKIE_SECURE:false}
+    cookie-domain: ${COOKIE_DOMAIN:localhost}
+    cookie-same-site: ${COOKIE_SAME_SITE:Lax}
+
+app:
+  cors:
+    front-end-url: ${FRONTEND_URL:http://localhost:5173}
+  auth:
+    frontend:
+      success-redirect: ${OAUTH_SUCCESS_REDIRECT:http://localhost:5173/auth/success}
+      failure-redirect: ${OAUTH_FAILURE_REDIRECT:http://localhost:5173/auth/failure}

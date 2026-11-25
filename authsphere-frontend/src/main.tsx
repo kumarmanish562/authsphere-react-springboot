@@ -8,24 +8,25 @@ import {
 import App from "./App";
 import "./index.css";
 
-import LoginPage from "./pages/LoginPage";
-import SignupPage from "./pages/SignupPage";
-import ServicesPage from "./pages/ServicesPage";
-import AboutPage from "./pages/AboutPage";
+import LoginPage from "./features/auth/pages/LoginPage";
+import SignupPage from "./features/auth/pages/SignupPage";
+import ServicesPage from "./features/public/pages/ServicesPage";
+import AboutPage from "./features/public/pages/AboutPage";
 
-import RootLayout from "./pages/RootLayout";
+import RootLayout from "./features/common/layouts/RootLayout";
 
-import Userlayout from "./pages/users/Userlayout";
-import Userhome from "./pages/users/Userhome";
-import Userprofile from "./pages/users/Userprofile";
+import Userlayout from "./features/common/layouts/DashboardLayout";
+import Userhome from "./features/user/pages/OverviewPage";
+import Userprofile from "./features/user/pages/ProfilePage";
 
-import OAuthSuccess from "./pages/OAuthSuccess";
+import OAuthSuccess from "./features/auth/pages/OAuthSuccess";
+import OAuthFailure from "./features/auth/pages/OAuthFailure";
 
-import SecurityPage from "./pages/SecurityPage";
-import SessionsPage from "./pages/SessionsPage";
-import ApiAccessPage from "./pages/ApiAccessPage";
-import SettingsPage from "./pages/SettingsPage";
-import AboutDashboardPage from "./pages/AboutPage";
+import SecurityPage from "./features/security/pages/SecurityPage";
+import SessionsPage from "./features/sessions/pages/SessionsPage";
+import ApiAccessPage from "./features/apikeys/pages/ApiAccessPage";
+import SettingsPage from "./features/user/pages/SettingsPage";
+import AboutDashboardPage from "./features/public/pages/AboutPage";
 
 createRoot(
   document.getElementById("root")!
@@ -127,7 +128,7 @@ createRoot(
 
       <Route
         path="/auth/failure"
-        element={<OAuthSuccess />}
+        element={<OAuthFailure />}
       />
 
     </Routes>
