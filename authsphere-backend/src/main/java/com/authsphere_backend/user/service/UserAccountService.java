@@ -28,7 +28,7 @@ public interface UserAccountService {
 
     Map<String, String> setupTwoFactor(UUID userId);
 
-    UserDto verifyAndEnableTwoFactor(UUID userId, String code, HttpServletRequest httpRequest);
+    Map<String, Object> verifyAndEnableTwoFactor(UUID userId, String code, HttpServletRequest httpRequest);
 
     UserDto verifyEmail(UUID userId, HttpServletRequest httpRequest);
 }

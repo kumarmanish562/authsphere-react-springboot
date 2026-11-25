@@ -13,5 +13,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
 
     List<AuditLog> findTop20ByUserIdOrderByCreatedAtDesc(UUID userId);
 
+    List<AuditLog> findTop20ByOrderByCreatedAtDesc();
+
     long countByUserIdAndStatusAndCreatedAtAfter(UUID userId, String status, Instant after);
 }

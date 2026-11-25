@@ -8,7 +8,9 @@ import com.authsphere_backend.auth.dto.RegisterRequest;
 import com.authsphere_backend.auth.dto.ResetPasswordRequest;
 import com.authsphere_backend.auth.dto.TokenResponse;
 import com.authsphere_backend.auth.dto.VerifyEmailRequest;
+import com.authsphere_backend.auth.entity.TwoFactorBackupCode;
 import com.authsphere_backend.auth.entity.VerificationToken;
+import com.authsphere_backend.auth.repository.TwoFactorBackupCodeRepository;
 import com.authsphere_backend.auth.repository.VerificationTokenRepository;
 import com.authsphere_backend.auth.security.TotpService;
 import com.authsphere_backend.common.service.EmailService;
@@ -89,6 +91,8 @@ public class AuthController {
     private final EmailService emailService;
 
     private final TotpService totpService;
+
+    private final TwoFactorBackupCodeRepository backupCodeRepository;
 
     private final PasswordEncoder passwordEncoder;
 
@@ -584,7 +588,23 @@ public class AuthController {
             if (loginRequest.otpCode() == null || loginRequest.otpCode().isBlank()) {
                 throw new BadCredentialsException("2FA_REQUIRED");
             }
-            if (!totpService.verifyCode(user.getTotpSecret(), loginRequest.otpCode().trim())) {
+            String submittedCode = loginRequest.otpCode().trim().toUpperCase();
+            boolean validTotp = totpService.verifyCode(user.getTotpSecret(), submittedCode);
+            boolean validBackup = false;
+
+            if (!validTotp) {
+                for (TwoFactorBackupCode bc : backupCodeRepository.findByUserIdAndUsedFalse(user.getId())) {
+                    if (passwordEncoder.matches(submittedCode, bc.getCodeHash())) {
+                        bc.setUsed(true);
+                        backupCodeRepository.save(bc);
+                        validBackup = true;
+                        auditLogService.log(user, "BACKUP_CODE_USED", "Signed in using a 2FA backup recovery code", "WARNING", request);
+                        break;
+                    }
+                }
+            }
+
+            if (!validTotp && !validBackup) {
                 auditLogService.log(user, "LOGIN_FAILED", "Invalid 2FA verification code", "FAILURE", request);
                 throw new BadCredentialsException("Invalid 2FA verification code");
             }

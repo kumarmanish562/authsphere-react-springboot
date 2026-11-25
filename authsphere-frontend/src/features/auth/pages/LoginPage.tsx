@@ -859,14 +859,13 @@ function LoginPage() {
 
             {requiresTwoFactor && (
               <div className="space-y-2">
-                <Label htmlFor="otpCode">Authenticator Code (2FA)</Label>
+                <Label htmlFor="otpCode">Authenticator or Backup Code (2FA)</Label>
                 <Input
                   id="otpCode"
                   name="otpCode"
                   type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="Enter 6-digit OTP"
+                  maxLength={9}
+                  placeholder="6-digit OTP or XXXX-XXXX"
                   value={data.otpCode || ""}
                   onChange={handleInputChange}
                   disabled={authLoading}

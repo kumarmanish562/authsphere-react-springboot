@@ -587,6 +587,17 @@ function Userlayout() {
               }
             />
 
+            {user?.roles?.some((r) => r.name === "ROLE_ADMIN") && (
+              <SidebarLink
+                to="/dashboard/admin"
+                icon={Shield}
+                label="Admin Console"
+                onClick={() =>
+                  setMobileOpen(false)
+                }
+              />
+            )}
+
           </nav>
 
 

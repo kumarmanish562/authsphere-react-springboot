@@ -30,9 +30,12 @@ export const setupTwoFactor = async (): Promise<{
   return data;
 };
 
-export const verifyTwoFactor = async (code: string): Promise<User> => {
-  const { data } = await apiClient.post<User>("/security/two-factor/verify", {
-    code,
-  });
+export const verifyTwoFactor = async (
+  code: string
+): Promise<{ user: User; backupCodes: string[] }> => {
+  const { data } = await apiClient.post<{ user: User; backupCodes: string[] }>(
+    "/security/two-factor/verify",
+    { code }
+  );
   return data;
 };

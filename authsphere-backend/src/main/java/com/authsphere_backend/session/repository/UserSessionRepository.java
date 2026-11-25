@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,8 @@ import java.util.UUID;
 public interface UserSessionRepository extends JpaRepository<UserSession, UUID> {
 
     List<UserSession> findByUserIdAndActiveTrueOrderByLastActiveAtDesc(UUID userId);
+
+    long countByActiveTrueAndExpiresAtAfter(Instant now);
 
     Optional<UserSession> findByIdAndUserId(UUID id, UUID userId);
 
@@ -28,4 +31,6 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     @Modifying
     @Query("UPDATE UserSession s SET s.active = false WHERE s.user.id = :userId AND s.active = true")
     int revokeAllUserSessions(@Param("userId") UUID userId);
+
+    long deleteByExpiresAtBeforeOrActiveFalse(Instant cutoff);
 }

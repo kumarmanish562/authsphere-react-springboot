@@ -2,6 +2,8 @@ package com.authsphere_backend.user.service;
 
 
 import com.authsphere_backend.user.service.UserAccountServiceImpl;
+import com.authsphere_backend.auth.entity.TwoFactorBackupCode;
+import com.authsphere_backend.auth.repository.TwoFactorBackupCodeRepository;
 import com.authsphere_backend.auth.security.TotpService;
 import com.authsphere_backend.user.dto.ChangePasswordRequest;
 import com.authsphere_backend.user.dto.UpdateProfileRequest;
@@ -33,6 +35,7 @@ public class UserAccountServiceImpl implements UserAccountService {
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
     private final TotpService totpService;
+    private final TwoFactorBackupCodeRepository backupCodeRepository;
     private final ModelMapper modelMapper;
 
     @Override
@@ -124,6 +127,7 @@ public class UserAccountServiceImpl implements UserAccountService {
         user.setTwoFactorEnabled(enabled);
         if (!enabled) {
             user.setTotpSecret(null);
+            backupCodeRepository.deleteByUserId(userId);
         }
         User saved = userRepository.save(user);
 
@@ -150,7 +154,7 @@ public class UserAccountServiceImpl implements UserAccountService {
 
     @Override
     @Transactional
-    public UserDto verifyAndEnableTwoFactor(UUID userId, String code, HttpServletRequest httpRequest) {
+    public java.util.Map<String, Object> verifyAndEnableTwoFactor(UUID userId, String code, HttpServletRequest httpRequest) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -161,11 +165,27 @@ public class UserAccountServiceImpl implements UserAccountService {
         user.setTwoFactorEnabled(true);
         User saved = userRepository.save(user);
 
+        backupCodeRepository.deleteByUserId(userId);
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        java.util.List<String> plainCodes = new java.util.ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            String raw = String.format("%04X-%04X", random.nextInt(0x10000), random.nextInt(0x10000));
+            plainCodes.add(raw);
+            backupCodeRepository.save(TwoFactorBackupCode.builder()
+                    .user(saved)
+                    .codeHash(passwordEncoder.encode(raw))
+                    .used(false)
+                    .build());
+        }
+
         auditLogService.log(saved, "TWO_FACTOR_ENABLED",
-                "Verified and enabled TOTP two-factor authentication",
+                "Verified and enabled TOTP two-factor authentication with backup codes",
                 "SUCCESS", httpRequest);
 
-        return modelMapper.map(saved, UserDto.class);
+        return java.util.Map.of(
+                "user", modelMapper.map(saved, UserDto.class),
+                "backupCodes", plainCodes
+        );
     }
 
     @Override

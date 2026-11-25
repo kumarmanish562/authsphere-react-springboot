@@ -46,7 +46,7 @@ public class SecurityController {
     }
 
     @PostMapping("/two-factor/verify")
-    public ResponseEntity<UserDto> verifyTwoFactor(
+    public ResponseEntity<Map<String, Object>> verifyTwoFactor(
             @AuthenticationPrincipal User user,
             @RequestBody Map<String, String> body,
             HttpServletRequest request

@@ -98,6 +98,7 @@ const SecurityPage: React.FC = () => {
   const [totpUri, setTotpUri] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [verifyingTotp, setVerifyingTotp] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -154,9 +155,9 @@ const SecurityPage: React.FC = () => {
 
     try {
       setVerifyingTotp(true);
-      const updatedUser = await verifyTwoFactor(totpCode.trim());
-      setUser(updatedUser);
-      setTotpModalOpen(false);
+      const res = await verifyTwoFactor(totpCode.trim());
+      setUser(res.user);
+      setBackupCodes(res.backupCodes);
       await loadData();
       toast.success("Two-factor authentication verified and enabled!");
     } catch {
@@ -1111,54 +1112,89 @@ const SecurityPage: React.FC = () => {
         </section>
       </main>
 
-      <Dialog open={totpModalOpen} onOpenChange={setTotpModalOpen}>
+      <Dialog open={totpModalOpen} onOpenChange={(open) => {
+        setTotpModalOpen(open);
+        if (!open) setBackupCodes(null);
+      }}>
         <DialogContent className="border-white/10 bg-[#0d0d0d] text-white">
           <DialogHeader>
-            <DialogTitle>Setup Two-Factor Authentication</DialogTitle>
+            <DialogTitle>
+              {backupCodes ? "Save Your Backup Recovery Codes" : "Setup Two-Factor Authentication"}
+            </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Scan this QR code with Google Authenticator or Authy, then enter the 6-digit code below.
+              {backupCodes
+                ? "Store these single-use recovery codes in a safe place. Each code can be used once if you lose your authenticator device."
+                : "Scan this QR code with Google Authenticator or Authy, then enter the 6-digit code below."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col items-center gap-4 py-2">
-            {totpUri && (
-              <div className="rounded-xl bg-white p-3">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(totpUri)}`}
-                  alt="TOTP QR Code"
-                  className="h-40 w-40"
-                />
+          {backupCodes ? (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-4">
+                {backupCodes.map((code) => (
+                  <code key={code} className="text-center font-mono text-sm tracking-wider text-amber-300">
+                    {code}
+                  </code>
+                ))}
               </div>
-            )}
-
-            <div className="w-full space-y-1 text-center">
-              <p className="text-xs text-zinc-500">Or enter this secret key manually:</p>
-              <code className="block rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs tracking-widest text-cyan-400">
-                {totpSecret}
-              </code>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(backupCodes.join("\n"));
+                    toast.success("Backup codes copied to clipboard.");
+                  }}
+                >
+                  Copy All Codes
+                </Button>
+                <Button onClick={() => { setTotpModalOpen(false); setBackupCodes(null); }}>
+                  Done
+                </Button>
+              </DialogFooter>
             </div>
+          ) : (
+            <>
+              <div className="flex flex-col items-center gap-4 py-2">
+                {totpUri && (
+                  <div className="rounded-xl bg-white p-3">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(totpUri)}`}
+                      alt="TOTP QR Code"
+                      className="h-40 w-40"
+                    />
+                  </div>
+                )}
 
-            <div className="w-full space-y-2">
-              <Label htmlFor="totp-code">6-Digit Verification Code</Label>
-              <Input
-                id="totp-code"
-                maxLength={6}
-                placeholder="123456"
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value)}
-                className="border-white/10 bg-white/[0.03] text-center text-lg tracking-widest"
-              />
-            </div>
-          </div>
+                <div className="w-full space-y-1 text-center">
+                  <p className="text-xs text-zinc-500">Or enter this secret key manually:</p>
+                  <code className="block rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs tracking-widest text-cyan-400">
+                    {totpSecret}
+                  </code>
+                </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setTotpModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleVerifyTotp} disabled={verifyingTotp}>
-              {verifyingTotp ? "Verifying..." : "Verify & Enable"}
-            </Button>
-          </DialogFooter>
+                <div className="w-full space-y-2">
+                  <Label htmlFor="totp-code">6-Digit Verification Code</Label>
+                  <Input
+                    id="totp-code"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value)}
+                    className="border-white/10 bg-white/[0.03] text-center text-lg tracking-widest"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setTotpModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleVerifyTotp} disabled={verifyingTotp}>
+                  {verifyingTotp ? "Verifying..." : "Verify & Enable"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -30,6 +30,7 @@ import SessionsPage from "./features/sessions/pages/SessionsPage";
 import ApiAccessPage from "./features/apikeys/pages/ApiAccessPage";
 import SettingsPage from "./features/user/pages/SettingsPage";
 import AboutDashboardPage from "./features/public/pages/AboutPage";
+import AdminPage from "./features/admin/pages/AdminPage";
 
 createRoot(
   document.getElementById("root")!
@@ -115,6 +116,11 @@ createRoot(
         <Route
           path="about"
           element={<AboutDashboardPage />}
+        />
+
+        <Route
+          path="admin"
+          element={<AdminPage />}
         />
 
       </Route>

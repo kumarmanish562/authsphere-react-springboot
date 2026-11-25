@@ -3,6 +3,7 @@ package com.authsphere_backend.common.config;
 
 import com.authsphere_backend.common.config.AppConstants;
 import com.authsphere_backend.common.config.SecurityConfig;
+import com.authsphere_backend.apikey.security.ApiKeyAuthenticationFilter;
 import com.authsphere_backend.auth.security.JwtAuthenticationFilter;
 import com.authsphere_backend.auth.security.RateLimitFilter;
 import com.authsphere_backend.common.dtos.ApiError;
@@ -46,6 +47,7 @@ public class SecurityConfig {
 
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final AuthenticationSuccessHandler successHandler;
 
@@ -54,10 +56,12 @@ public class SecurityConfig {
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
             RateLimitFilter rateLimitFilter,
             AuthenticationSuccessHandler successHandler
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
         this.rateLimitFilter = rateLimitFilter;
         this.successHandler = successHandler;
     }
@@ -178,6 +182,10 @@ public class SecurityConfig {
 
                 .addFilterBefore(
                         rateLimitFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
+                .addFilterBefore(
+                        apiKeyAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
